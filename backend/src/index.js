@@ -2,44 +2,39 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const { MikroORM, RequestContext } = require('@mikro-orm/core');
-const axios = require('axios'); // Using axios instead of fetch
+const axios = require('axios');
 const config = require('./config/mikro-orm.config');
 
 const app = express();
 const PORT =  3001;
 
-// Middleware
 app.use(bodyParser.json());
 app.use(cors());
 
 let orm;
 
-// Initialize MikroORM
 async function initORM() {
   try {
     orm = await MikroORM.init(config);
     const generator = orm.getSchemaGenerator();
     await generator.ensureDatabase();
     await generator.updateSchema(); // Safe for existing databases
-    console.log('✅ Database connected');
+    console.log('Database connected');
     return orm;
   } catch (error) {
-    console.error('❌ Failed to initialize ORM:', error);
+    console.error('Failed to initialize ORM:', error);
     throw error;
   }
 }
 
-// Create request context for MikroORM
 app.use((req, res, next) => {
   RequestContext.create(orm.em, next);
 });
 
-// Proxy endpoint (using axios)
 app.post('/api/proxy', async (req, res) => {
   try {
     const { method, url, headers = {}, body } = req.body;
 
-    // Make HTTP request using axios
     const response = await axios({
       method,
       url,
@@ -51,7 +46,6 @@ app.post('/api/proxy', async (req, res) => {
       timeout: 5000, // 5-second timeout
     });
 
-    // Save request to history
     const requestHistory = orm.em.create('RequestHistory', {
       method,
       url,
@@ -62,7 +56,6 @@ app.post('/api/proxy', async (req, res) => {
     });
     await orm.em.persistAndFlush(requestHistory);
 
-    // Return successful response
     res.json({
       status: response.status,
       data: response.data,
@@ -71,16 +64,13 @@ app.post('/api/proxy', async (req, res) => {
   } catch (error) {
     console.error('Proxy error:', error.message);
 
-    // Handle different types of errors
     let errorMessage = 'Failed to make request';
     let statusCode = 500;
 
     if (error.response) {
-      // Server responded with non-2xx status
       statusCode = error.response.status;
       errorMessage = error.response.data || error.message;
     } else if (error.request) {
-      // Request was made but no response received
       errorMessage = 'No response from server (timeout)';
     }
 
@@ -91,7 +81,6 @@ app.post('/api/proxy', async (req, res) => {
   }
 });
 
-// Get request history (paginated)
 app.get('/api/history', async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
@@ -119,7 +108,6 @@ app.get('/api/history', async (req, res) => {
   }
 });
 
-// Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'OK',
@@ -128,7 +116,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Global error handler
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({ error: 'Internal server error' });
@@ -138,10 +125,10 @@ app.use((err, req, res, next) => {
 initORM()
   .then(() => {
     app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
+      console.log(`Server running on http://localhost:${PORT}`);
     });
   })
   .catch((err) => {
-    console.error('❌ Failed to start server:', err);
+    console.error('Failed to start server:', err);
     process.exit(1);
   });

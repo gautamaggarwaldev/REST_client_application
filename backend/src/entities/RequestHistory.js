@@ -1,4 +1,3 @@
-// backend/src/entities/RequestHistory.js
 const { EntitySchema } = require('@mikro-orm/core');
 
 const schema = new EntitySchema({
